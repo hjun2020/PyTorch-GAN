@@ -17,9 +17,11 @@ import sys
 
 import torchvision.transforms as transforms
 from torchvision.utils import save_image, make_grid
+import torchvision
 
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
+
 
 from models import *
 from datasets import *
@@ -73,12 +75,10 @@ generator.load_state_dict(state_dict)
 # An example input you would normally provide to your model's forward() method.
 example = torch.rand(1, 3, 64, 64).to(device)
 
-# Use torch.jit.trace to generate a torch.jit.ScriptModule via tracing.
-traced_script_module = torch.jit.trace(generator, example)
 
-
-traced_script_module.save("generator_ex_cpu.pt")
-
+# Export the model to ONNX format
+onnx_path = "generator_ex.onnx"
+torch.onnx.export(generator, example, onnx_path, opset_version=12, input_names=["input"], output_names=["output"])
 
 
 
