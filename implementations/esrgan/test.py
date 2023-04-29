@@ -55,7 +55,7 @@ print(opt)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
+device = 'cpu'
 
 hr_shape = (opt.hr_height, opt.hr_width)
 
@@ -71,13 +71,13 @@ state_dict = torch.load(model_path)
 generator.load_state_dict(state_dict)
 
 # An example input you would normally provide to your model's forward() method.
-example = torch.rand(4, 3, 64, 64).to(device)
+example = torch.rand(1, 3, 64, 64).to(device)
 
 # Use torch.jit.trace to generate a torch.jit.ScriptModule via tracing.
 traced_script_module = torch.jit.trace(generator, example)
 
 
-traced_script_module.save("generator_ex.pt")
+traced_script_module.save("generator_ex_cpu.pt")
 
 
 
