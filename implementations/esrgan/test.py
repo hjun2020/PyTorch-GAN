@@ -63,7 +63,7 @@ hr_shape = (opt.hr_height, opt.hr_width)
 # Initialize generator and discriminator
 generator = GeneratorRRDB(opt.channels, filters=64, num_res_blocks=opt.residual_blocks).to(device)
 
-model_path = "saved_models/generator_22.pth" # assuming the model was saved at epoch 10
+model_path = "saved_models/generator_45.pth" # assuming the model was saved at epoch 10
 
 # Load the saved model state dictionary
 state_dict = torch.load(model_path)

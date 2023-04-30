@@ -226,9 +226,9 @@ int main(int argc, const char* argv[]) {
     at::Tensor output_tensor = module.forward({input_tensor}).toTensor();
     std::cout << "Shape after permutation: " << output_tensor.size(0) << " " <<output_tensor.size(1) << " "<< output_tensor.size(2) << " "<<  output_tensor.size(3) << std::endl;
 
-    output_tensor = output_tensor.to(torch::kCPU);
     
     output_tensor = output_tensor.permute({0, 2, 3, 1});
+    output_tensor = output_tensor.to(torch::kCPU);
     // std::cout << "Shape after permutation: " << output_tensor.size(0) << " " <<output_tensor.size(1) << " "<< output_tensor.size(2) << " "<<  output_tensor.size(3) << std::endl;
 
 

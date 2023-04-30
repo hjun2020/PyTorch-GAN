@@ -144,9 +144,9 @@ class GeneratorRRDB(nn.Module):
         upsampling = []
         for _ in range(int(self.scale_factor/2)):
             upsampling += [
-                nn.Conv2d(64, 256, kernel_size=3, padding=1),
-                nn.PixelShuffle(upscale_factor=2),
-                # nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
+                # nn.Conv2d(64, 256, kernel_size=3, padding=1),
+                # nn.PixelShuffle(upscale_factor=2),
+                nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
 
                 nn.PReLU()
             ]
