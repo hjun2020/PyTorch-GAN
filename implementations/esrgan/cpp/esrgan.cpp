@@ -220,7 +220,7 @@ int main(int argc, const char* argv[]) {
     // std::cout << "Shape after permutation: " << input_tensor.size(0) << " " <<input_tensor.size(1) << " "<< input_tensor.size(2) << " "<<  input_tensor.size(3) << std::endl;
 
 
-    input_tensor = input_tensor.to(torch::kCPU);
+    input_tensor = input_tensor.to(torch::kCUDA);
 
     // Run inference on the input tensor
     at::Tensor output_tensor = module.forward({input_tensor}).toTensor();

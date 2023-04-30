@@ -55,14 +55,15 @@ print(opt)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-device = 'cpu'
+
+
 
 hr_shape = (opt.hr_height, opt.hr_width)
 
 # Initialize generator and discriminator
 generator = GeneratorRRDB(opt.channels, filters=64, num_res_blocks=opt.residual_blocks).to(device)
 
-model_path = "saved_models/generator_45.pth" # assuming the model was saved at epoch 10
+model_path = "saved_models/generator_22.pth" # assuming the model was saved at epoch 10
 
 # Load the saved model state dictionary
 state_dict = torch.load(model_path)
@@ -77,7 +78,7 @@ example = torch.rand(1, 3, 64, 64).to(device)
 traced_script_module = torch.jit.trace(generator, example)
 
 
-traced_script_module.save("generator_ex_cpu.pt")
+traced_script_module.save("generator_ex.pt")
 
 
 

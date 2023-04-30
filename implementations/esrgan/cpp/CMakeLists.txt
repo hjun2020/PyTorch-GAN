@@ -14,6 +14,6 @@ include_directories(/usr/local/include)
 # link directories for ONNX Runtime library
 link_directories(/usr/local/lib)
 
-add_executable(main main.cpp)
-target_link_libraries(main "${OpenCV_LIBS}" "${TORCH_LIBRARIES}" onnxruntime)
-set_property(TARGET main PROPERTY CXX_STANDARD 14)
+add_executable(esrgan esrgan.cpp)
+target_link_libraries(esrgan "${OpenCV_LIBS}" "${TORCH_LIBRARIES}" onnxruntime)
+set_property(TARGET esrgan PROPERTY CXX_STANDARD 14)
