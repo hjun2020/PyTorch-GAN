@@ -137,7 +137,7 @@
 
 #include "onnxruntime_cxx_api.h"
 
-
+#include <pthread.h>
 
 using namespace cv;
 static torch::Tensor input_im_buffer[3];
@@ -146,6 +146,7 @@ static void * cap;
 static int buff_index = 0;
 static cv::Mat output_im_buffer[3];
 
+static torch::jit::script::Module module;
 static cv::Scalar mean_demo = {0.485, 0.456, 0.406};  // Define mean values
 static cv::Scalar std_demo = {0.229, 0.224, 0.225};  // Define standard deviation values
 
@@ -158,7 +159,7 @@ static Mat get_mat_from_stream(void *p)
     return m;
 }
 
-static void *load_input_mat_demo()
+static void *load_input_mat_demo(void *args)
 {
 
     // free(input_im_buffer[buff_index%3]);
@@ -178,31 +179,34 @@ static void *load_input_mat_demo()
     input_tensor = input_tensor.to(torch::kCUDA);
 
     input_im_buffer[buff_index%3] = input_tensor;
-    return 0;
 
 }
 
-static void *convert_output_tensor_demo()
+static void *convert_output_tensor_demo(void *args)
+{
+    torch::Tensor output_tensor = net_output_buffer[(buff_index+2)%3];
+    output_tensor = output_tensor.permute({0, 2, 3, 1});
+    output_tensor = output_tensor.to(torch::kCPU);
+    // std::cout << "Shape after permutation: " << output_tensor.size(0) << " " <<output_tensor.size(1) << " "<< output_tensor.size(2) << " "<<  output_tensor.size(3) << std::endl;
+
+
+    // // // Convert the output tensor to a cv::Mat object
+    cv::Mat output_image(output_tensor.size(1), output_tensor.size(2), CV_32FC3, output_tensor.data_ptr<float>());
+    // output_image *= 255.0;
+
+    cv::multiply(output_image, std_demo, output_image);  // Multiply each channel by standard deviation values
+    cv::add(output_image, mean_demo, output_image);  // Add mean values to each channel
+
+    cv::cvtColor(output_image, output_image, cv::COLOR_BGR2RGB);
+    output_image *= 255.0;
+    output_im_buffer[(buff_index+2)%3] = output_image;
+
+}
+
+static void *inference_demo(void *args)
 {
 
-    // free(input_im_buffer[buff_index%3]);
-    // input_im_buffer[buff_index%3].detach();
-    cv::Mat image= get_mat_from_stream(cap);
-    image.convertTo(image, CV_32FC3, 1.0 / 255.0);  // Convert to float and scale to [0, 1]
-    cv::subtract(image, mean_demo, image);  // Subtract mean values from each channel
-    cv::divide(image, std_demo, image);  // Divide each channel by standard deviation values
-
-    cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
-
-    // Convert the input image to a Torch tensor
-    torch::Tensor input_tensor = torch::from_blob(image.data, {1, image.rows, image.cols, 3}, torch::kFloat);
-    input_tensor = input_tensor.permute({0, 3, 1, 2});
-    
-
-    input_tensor = input_tensor.to(torch::kCUDA);
-
-    input_im_buffer[buff_index%3] = input_tensor;
-    return 0;
+    net_output_buffer[(buff_index+1)%3] = module.forward({input_im_buffer[(buff_index+1)%3]}).toTensor();
 
 }
 
@@ -226,7 +230,6 @@ int main(int argc, const char* argv[]) {
   }
 
     // Load the Torch model
-    torch::jit::script::Module module;
     try {
         module = torch::jit::load(argv[1]);
     }
@@ -241,78 +244,51 @@ int main(int argc, const char* argv[]) {
     cap = open_video_stream(filename, 0, 0, 0, 0);
     }
 
-    pthread_t predict_thread;
-    pthread_t input_y_im_thread;
-    pthread_t merge_thread;
-    pthread_t input_thread;
-    pthread_t data_pred_thread;
-    pthread_t output_thread;
+    pthread_t load_input_thread;
+    pthread_t inference_thread;
+    pthread_t convert_output_thread;
 
-
-    load_input_mat_demo();
-
-
-    // Load the input image using OpenCV
-    cv::Mat image = cv::imread("/home/ubuntu/PyTorch-GAN/data/img_align_celeba/000001.jpg", cv::IMREAD_COLOR);
-
-        // Convert to float and normalize
-    // cv::Size size(64, 64);  // define the new size of the image
-    // cv::resize(image, image, size);  // resize the image
-    imwrite("original_input.jpg", image);
-    image.convertTo(image, CV_32FC3, 1.0 / 255.0);  // Convert to float and scale to [0, 1]
-
-    cv::subtract(image, mean_demo, image);  // Subtract mean values from each channel
-    cv::divide(image, std_demo, image);  // Divide each channel by standard deviation values
-
-
-    // // cv::Mat image;
-    cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
-
-    // Convert the input image to a Torch tensor
-    torch::Tensor input_tensor = torch::from_blob(image.data, {1, image.rows, image.cols, 3}, torch::kFloat);
-    input_tensor = input_tensor.permute({0, 3, 1, 2});
-    
-
-    input_tensor = input_tensor.to(torch::kCUDA);
-
-    // Run inference on the input tensor
-    auto start_time = std::chrono::high_resolution_clock::now();  
-    at::Tensor output_tensor;
-    for(int i=0; i <100; i++){
-      output_tensor = module.forward({input_tensor}).toTensor();
-
+    for(int i=0; i<3; i++){
+      load_input_mat_demo(0);
+      buff_index = (buff_index+1)%3;
     }
 
-    // Stop the timer
-    auto end_time = std::chrono::high_resolution_clock::now();
+    for(int i=0; i<3; i++){
+      inference_demo(0);
+      buff_index = (buff_index+1)%3;
+    }
 
-    // Compute the elapsed time
-    std::chrono::duration<double> elapsed_time = end_time - start_time;
+    // for(int i=0; i<3; i++){
+    //   convert_output_tensor_demo();
+    //   buff_index = (buff_index+1)%3;
+    // }
 
-    std::cout << "Elapsed time: " << elapsed_time.count() << "seconds" << std::endl;
-    std::cout << "Shape after permutation: " << output_tensor.size(0) << " " <<output_tensor.size(1) << " "<< output_tensor.size(2) << " "<<  output_tensor.size(3) << std::endl;
+    // imwrite("inference_buff_output.jpg", output_im_buffer[2]);
+    void *ptr;
+    int count = 0;
+    while(1){
+        // memcpy(pred_buffer[t%3], network_predict_data_to_float(net, d), net->outputs*args.n*sizeof(float));
+        // if(pthread_create(&load_input_thread, NULL, load_input_mat_demo, NULL)) error("Thread creation failed");
+        // if(pthread_create(&inference_thread, NULL, inference_demo, NULL)) error("Thread creation failed");
+        // if(pthread_create(&convert_output_thread, NULL, convert_output_tensor_demo, NULL)) error("Thread creation failed");
 
-    
-    output_tensor = output_tensor.permute({0, 2, 3, 1});
-    output_tensor = output_tensor.to(torch::kCPU);
-    // std::cout << "Shape after permutation: " << output_tensor.size(0) << " " <<output_tensor.size(1) << " "<< output_tensor.size(2) << " "<<  output_tensor.size(3) << std::endl;
+        pthread_create(&load_input_thread, NULL, load_input_mat_demo, NULL);
+        pthread_create(&inference_thread, NULL, inference_demo, NULL);
+        pthread_create(&convert_output_thread, NULL, convert_output_tensor_demo, NULL);
 
-
-    // // // Convert the output tensor to a cv::Mat object
-    cv::Mat output_image(output_tensor.size(1), output_tensor.size(2), CV_32FC3, output_tensor.data_ptr<float>());
-    // output_image *= 255.0;
-
-    cv::multiply(output_image, std_demo, output_image);  // Multiply each channel by standard deviation values
-    cv::add(output_image, mean_demo, output_image);  // Add mean values to each channel
-
-    cv::cvtColor(output_image, output_image, cv::COLOR_BGR2RGB);
-    output_image *= 255.0;
+        pthread_join(load_input_thread,0);
+        pthread_join(inference_thread,0);
+        pthread_join(convert_output_thread,0);
 
 
-    // cv::Mat result; // initialize the output image
-    // cv::hconcat(output_image, output_image, result); 
+        buff_index = (buff_index+1)%3;
+        count++;
 
-    // imwrite("output.jpg", result);
+        if(count>20) break;
+    }
+
+
+
 
 
   std::cout << "ok\n";
@@ -327,4 +303,57 @@ int main(int argc, const char* argv[]) {
     // cv::Mat img_out(tensor_image.size(1), tensor_image.size(2), CV_8UC3, tensor_image.data_ptr<float>());
     // // cv::cvtColor(img_out, img_out, cv::COLOR_BGR2RGB);
 
+
+
+
+
+
+
+
+
+    // // Load the input image using OpenCV
+    // cv::Mat image = cv::imread("/home/ubuntu/PyTorch-GAN/data/img_align_celeba/000001.jpg", cv::IMREAD_COLOR);
+
+    // imwrite("original_input.jpg", image);
+    // image.convertTo(image, CV_32FC3, 1.0 / 255.0);  // Convert to float and scale to [0, 1]
+
+    // cv::subtract(image, mean_demo, image);  // Subtract mean values from each channel
+    // cv::divide(image, std_demo, image);  // Divide each channel by standard deviation values
+
+
+    // cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
+
+    // // Convert the input image to a Torch tensor
+    // torch::Tensor input_tensor = torch::from_blob(image.data, {1, image.rows, image.cols, 3}, torch::kFloat);
+    // input_tensor = input_tensor.permute({0, 3, 1, 2});
+    
+
+    // input_tensor = input_tensor.to(torch::kCUDA);
+
+    // // Run inference on the input tensor
+    // auto start_time = std::chrono::high_resolution_clock::now();  
+    // at::Tensor output_tensor;
+    // output_tensor = module.forward({input_tensor}).toTensor();
+
+    // // Stop the timer
+    // auto end_time = std::chrono::high_resolution_clock::now();
+
+    // // Compute the elapsed time
+    // std::chrono::duration<double> elapsed_time = end_time - start_time;
+
+    // std::cout << "Elapsed time: " << elapsed_time.count() << "seconds" << std::endl;
+    // std::cout << "Shape after permutation: " << output_tensor.size(0) << " " <<output_tensor.size(1) << " "<< output_tensor.size(2) << " "<<  output_tensor.size(3) << std::endl;
+
+    
+    // output_tensor = output_tensor.permute({0, 2, 3, 1});
+    // output_tensor = output_tensor.to(torch::kCPU);
+
+
+    // // Convert the output tensor to a cv::Mat object
+    // cv::Mat output_image(output_tensor.size(1), output_tensor.size(2), CV_32FC3, output_tensor.data_ptr<float>());
+    // cv::multiply(output_image, std_demo, output_image);  // Multiply each channel by standard deviation values
+    // cv::add(output_image, mean_demo, output_image);  // Add mean values to each channel
+
+    // cv::cvtColor(output_image, output_image, cv::COLOR_BGR2RGB);
+    // output_image *= 255.0;
     // imwrite("temp_input1.jpg", img_out);
