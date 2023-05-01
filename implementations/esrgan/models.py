@@ -123,12 +123,14 @@ class ResidualBlock(nn.Module):
         return out
 
 class GeneratorRRDB(nn.Module):
-    def __init__(self, channels=3, filters=64, num_upsample=2, num_res_blocks=16):
+    ################### TODO######################################
+    ## The channels must be from an argument in esrgan.py args!!!!!!!!!!!!!!!!!!!!!!
+    def __init__(self, channels=1, filters=64, num_upsample=2, num_res_blocks=16):
         super(GeneratorRRDB, self).__init__()
         self.scale_factor = num_upsample * 2
         self.num_residual_blocks = num_res_blocks
 
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=9, padding=4)
+        self.conv1 = nn.Conv2d(channels, 64, kernel_size=9, padding=4)
         self.prelu1 = nn.PReLU()
         
         # Add residual blocks
@@ -144,9 +146,9 @@ class GeneratorRRDB(nn.Module):
         upsampling = []
         for _ in range(int(self.scale_factor/2)):
             upsampling += [
-                # nn.Conv2d(64, 256, kernel_size=3, padding=1),
-                # nn.PixelShuffle(upscale_factor=2),
-                nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
+                nn.Conv2d(64, 256, kernel_size=3, padding=1),
+                nn.PixelShuffle(upscale_factor=2),
+                # nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
 
                 nn.PReLU()
             ]
