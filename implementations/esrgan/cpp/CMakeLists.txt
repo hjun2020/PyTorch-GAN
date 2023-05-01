@@ -13,7 +13,6 @@ include_directories(/usr/local/include)
 
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GTK2 REQUIRED gtk+-2.0)
 
 # link directories for ONNX Runtime library
 link_directories(/usr/local/lib)
