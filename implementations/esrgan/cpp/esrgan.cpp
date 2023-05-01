@@ -150,6 +150,8 @@ static torch::jit::script::Module module;
 static cv::Scalar mean_demo = {0.485, 0.456, 0.406};  // Define mean values
 static cv::Scalar std_demo = {0.229, 0.224, 0.225};  // Define standard deviation values
 
+
+
 static Mat get_mat_from_stream(void *p)
 {
     VideoCapture *cap = (VideoCapture *)p;
@@ -210,6 +212,28 @@ static void *inference_demo(void *args)
 
 }
 
+void *display_in_thread_srcnn_demo(void *args)
+{
+    cv::imshow("Video", output_im_buffer[(buff_index + 3)%3]);
+    // free_image(out_im_buffer[(buff_index + 1)%3]);
+    // if (c != -1) c = c%256;
+    // if (c == 27) {
+    //     demo_done = 1;
+    //     return 0;
+    // } else if (c == 82) {
+    //     demo_thresh += .02;
+    // } else if (c == 84) {
+    //     demo_thresh -= .02;
+    //     if(demo_thresh <= .02) demo_thresh = .02;
+    // } else if (c == 83) {
+    //     demo_hier += .02;
+    // } else if (c == 81) {
+    //     demo_hier -= .02;
+    //     if(demo_hier <= .0) demo_hier = .0;
+    // }
+    return 0;
+}
+
 
 void *open_video_stream(const char *f, int c, int w, int h, int fps)
 {
@@ -264,14 +288,23 @@ int main(int argc, const char* argv[]) {
     // }
 
     // imwrite("inference_buff_output.jpg", output_im_buffer[2]);
+    auto start_time = std::chrono::high_resolution_clock::now();  
     void *ptr;
     int count = 0;
+    // Create the output video writer
+    cv::VideoCapture cap1(argv[2]);
+    int fourcc = cv::VideoWriter::fourcc('a', 'v', 'c', '1');
+    int fps = cap1.get(cv::CAP_PROP_FPS);
+    int width = cap1.get(cv::CAP_PROP_FRAME_WIDTH);
+    int height = cap1.get(cv::CAP_PROP_FRAME_HEIGHT);
+    cv::VideoWriter writer("output_video.mp4", fourcc, fps, cv::Size(width, height));
+
+
     while(1){
         // memcpy(pred_buffer[t%3], network_predict_data_to_float(net, d), net->outputs*args.n*sizeof(float));
         // if(pthread_create(&load_input_thread, NULL, load_input_mat_demo, NULL)) error("Thread creation failed");
         // if(pthread_create(&inference_thread, NULL, inference_demo, NULL)) error("Thread creation failed");
         // if(pthread_create(&convert_output_thread, NULL, convert_output_tensor_demo, NULL)) error("Thread creation failed");
-
         pthread_create(&load_input_thread, NULL, load_input_mat_demo, NULL);
         pthread_create(&inference_thread, NULL, inference_demo, NULL);
         pthread_create(&convert_output_thread, NULL, convert_output_tensor_demo, NULL);
@@ -279,14 +312,20 @@ int main(int argc, const char* argv[]) {
         pthread_join(load_input_thread,0);
         pthread_join(inference_thread,0);
         pthread_join(convert_output_thread,0);
-
+        output_im_buffer[buff_index].convertTo(output_im_buffer[buff_index], CV_8U);
+        writer.write(output_im_buffer[buff_index]);
+        
 
         buff_index = (buff_index+1)%3;
         count++;
 
-        if(count>20) break;
+        if(count>100) break;
     }
+    writer.release();
 
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_time = end_time - start_time;
+    std::cout << "Elapsed time: " << elapsed_time.count() << "seconds" << std::endl;
 
 
 
@@ -331,18 +370,13 @@ int main(int argc, const char* argv[]) {
     // input_tensor = input_tensor.to(torch::kCUDA);
 
     // // Run inference on the input tensor
-    // auto start_time = std::chrono::high_resolution_clock::now();  
     // at::Tensor output_tensor;
     // output_tensor = module.forward({input_tensor}).toTensor();
 
     // // Stop the timer
-    // auto end_time = std::chrono::high_resolution_clock::now();
 
     // // Compute the elapsed time
-    // std::chrono::duration<double> elapsed_time = end_time - start_time;
 
-    // std::cout << "Elapsed time: " << elapsed_time.count() << "seconds" << std::endl;
-    // std::cout << "Shape after permutation: " << output_tensor.size(0) << " " <<output_tensor.size(1) << " "<< output_tensor.size(2) << " "<<  output_tensor.size(3) << std::endl;
 
     
     // output_tensor = output_tensor.permute({0, 2, 3, 1});

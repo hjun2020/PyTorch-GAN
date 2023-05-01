@@ -4,7 +4,7 @@ project(custom_ops)
 find_package(Torch REQUIRED)
 find_package(OpenCV REQUIRED)
 
-include_directories(${OPENCV_INCLUDE_DIRS})
+include_directories(${OPENCV_INCLUDE_DIRS} ${GTK2_INCLUDE_DIRS})
 
 link_directories(${OPENCV_LIBRARY_DIRS})
 add_definitions(${OPENCV_CFLAGS_OTHER})
@@ -12,10 +12,12 @@ add_definitions(${OPENCV_CFLAGS_OTHER})
 include_directories(/usr/local/include)
 
 find_package(Threads REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GTK2 REQUIRED gtk+-2.0)
 
 # link directories for ONNX Runtime library
 link_directories(/usr/local/lib)
 
 add_executable(esrgan esrgan.cpp)
-target_link_libraries(esrgan "${OpenCV_LIBS}" "${TORCH_LIBRARIES}" onnxruntime Threads::Threads)
+target_link_libraries(esrgan "${OpenCV_LIBS}" "${TORCH_LIBRARIES}" "${GTK2_LIBRARIES}" onnxruntime Threads::Threads)
 set_property(TARGET esrgan PROPERTY CXX_STANDARD 14)
