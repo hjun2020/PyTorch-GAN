@@ -119,6 +119,7 @@ for epoch in range(opt.epoch, opt.n_epochs):
         # Measure pixel-wise loss against ground truth
         loss_pixel = criterion_pixel(gen_hr, imgs_hr)
 
+
         if batches_done < opt.warmup_batches:
             # Warm-up (pixel-wise loss only)
             loss_pixel.backward()
