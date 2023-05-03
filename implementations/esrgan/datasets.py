@@ -34,7 +34,7 @@ def rgb_to_ycrcb(img):
     cr = (r - y) * 0.713 + 128
     cb = (b - y) * 0.564 + 128
     ycrcb = torch.stack([y, cr, cb], dim=0)
-    return y
+    return ycrcb
 
 
 def denormalize(tensors):
@@ -71,12 +71,11 @@ class ImageDataset(Dataset):
         img_hr = self.hr_transform(img)
 
 
-        y_channel_hr = rgb_to_ycrcb(img_hr).unsqueeze(0)  # extract Y channel
+        ycrcb_hr = rgb_to_ycrcb(img_hr)  # extract Y channel
 
-        y_channel_lr = rgb_to_ycrcb(img_lr).unsqueeze(0)  # extract Y channel
-        # print(y_channel_lr.shape, "!!!!!!!!!!!!!!!!!!!")
+        ycrcb_lr = rgb_to_ycrcb(img_lr) # extract Y channel
 
-        return {"lr": y_channel_lr, "hr": y_channel_hr}
+        return {"lr": ycrcb_lr[0].unsqueeze(0), "hr": ycrcb_hr[0].unsqueeze(0), "ycrcb_lr":ycrcb_lr, "ycrcb_hr": ycrcb_hr}
 
     def __len__(self):
         return len(self.files)

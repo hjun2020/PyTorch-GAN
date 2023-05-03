@@ -59,6 +59,19 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 hr_shape = (opt.hr_height, opt.hr_width)
 
+def ycrcb_to_rgb(img):
+    r"""Converts a YCrCb image tensor to an RGB image tensor.
+    Args:
+        img (torch.Tensor): Input image tensor with dimensions (B, 3, H, W).
+    Returns:
+        torch.Tensor: RGB image tensor with dimensions (B, 3, H, W).
+    """
+    y, cr, cb = torch.chunk(img, chunks=3, dim=1)
+    r = y + 1.402 * (cr - 0.5)
+    g = y - 0.344 * (cb - 0.5) - 0.714 * (cr - 0.5)
+    b = y + 1.772 * (cb - 0.5)
+    return torch.cat([r, g, b], dim=1)
+
 # Initialize generator and discriminator
 generator = GeneratorRRDB(opt.channels, filters=64, num_res_blocks=opt.residual_blocks).to(device)
 discriminator = Discriminator(input_shape=(opt.channels, *hr_shape)).to(device)
@@ -121,6 +134,7 @@ for epoch in range(opt.epoch, opt.n_epochs):
 
 
         if batches_done < opt.warmup_batches:
+        # if batches_done < 3:
             # Warm-up (pixel-wise loss only)
             loss_pixel.backward()
             optimizer_G.step()
@@ -138,8 +152,8 @@ for epoch in range(opt.epoch, opt.n_epochs):
         loss_GAN = criterion_GAN(pred_fake - pred_real.mean(0, keepdim=True), valid)
 
         # Content loss
-        gen_features = feature_extractor(gen_hr)
-        real_features = feature_extractor(imgs_hr).detach()
+        gen_features = feature_extractor(imgs['ycrcb_hr'].to(device))
+        real_features = feature_extractor(imgs['ycrcb_hr'].to(device)).detach()
         loss_content = criterion_content(gen_features, real_features)
 
         # Total generator loss
