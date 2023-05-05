@@ -66,11 +66,15 @@ def ycrcb_to_rgb(img):
     Returns:
         torch.Tensor: RGB image tensor with dimensions (B, 3, H, W).
     """
-    y, cr, cb = torch.chunk(img, chunks=3, dim=1)
-    r = y + 1.402 * (cr - 0.5)
-    g = y - 0.344 * (cb - 0.5) - 0.714 * (cr - 0.5)
-    b = y + 1.772 * (cb - 0.5)
-    return torch.cat([r, g, b], dim=1)
+    y, cr, cb = img[:, 0, :, :], img[:, 1, :, :], img[:, 2, :, :]
+    r = y + 1.402 * (cr - 128)
+    g = y - 0.344 * (cb - 128) - 0.714 * (cr - 128)
+    b = y + 1.772 * (cb - 128)
+    return torch.stack([r, g, b], dim=1)
+
+
+
+
 
 # Initialize generator and discriminator
 generator = GeneratorRRDB(opt.channels, filters=64, num_res_blocks=opt.residual_blocks).to(device)
@@ -151,9 +155,31 @@ for epoch in range(opt.epoch, opt.n_epochs):
         # Adversarial loss (relativistic average GAN)
         loss_GAN = criterion_GAN(pred_fake - pred_real.mean(0, keepdim=True), valid)
 
+
         # Content loss
-        gen_features = feature_extractor(imgs['ycrcb_hr'].to(device))
-        real_features = feature_extractor(imgs['ycrcb_hr'].to(device)).detach()
+        gen_hr_combined = imgs['img_hr_sub']
+        gen_hr_combined[:, 0:1,:,:] = gen_hr
+        gen_hr_combined = ycrcb_to_rgb(gen_hr_combined)
+
+        # test_code
+        if i == 3 and epoch % 3 ==0 :
+            # gen_hr_combined_temp = denormalize(gen_hr_combined)
+            gen_hr_combined_temp = gen_hr_combined
+            save_image(gen_hr_combined[0], "test3.png")
+            # target_hr_temp = denormalize(imgs['target_hr'])
+            target_hr_temp = imgs['target_hr']
+            save_image(target_hr_temp[0], "target3.png")
+
+            imgs_lr_temp = ycrcb_to_rgb(imgs['img_hr_sub'])
+            # imgs_lr_temp = denormalize(imgs_lr_temp)
+            imgs_lr_temp = imgs_lr_temp
+            save_image(imgs_lr_temp[0], "low_res3.png")
+
+            save_image(imgs_lr[0][0], "y_channel_gen.png")
+        
+
+        gen_features = feature_extractor(gen_hr_combined.to(device))
+        real_features = feature_extractor(imgs['target_hr'].to(device)).detach()
         loss_content = criterion_content(gen_features, real_features)
 
         # Total generator loss
@@ -200,13 +226,13 @@ for epoch in range(opt.epoch, opt.n_epochs):
             )
         )
 
-        if batches_done % opt.sample_interval == 0:
-            # Save image grid with upsampled inputs and ESRGAN outputs
-            imgs_lr = nn.functional.interpolate(imgs_lr, scale_factor=4)
-            img_grid = denormalize(torch.cat((imgs_lr, gen_hr), -1))
-            save_image(img_grid, "images/training/%d.png" % batches_done, nrow=1, normalize=False)
+        # if batches_done % opt.sample_interval == 0:
+        #     # Save image grid with upsampled inputs and ESRGAN outputs
+        #     imgs_lr = nn.functional.interpolate(imgs_lr, scale_factor=4)
+        #     img_grid = denormalize(torch.cat((imgs_lr, gen_hr), -1))
+        #     save_image(img_grid, "images/training/%d.png" % batches_done, nrow=1, normalize=False)
 
-        if batches_done % opt.checkpoint_interval == 0:
-            # Save model checkpoints
-            torch.save(generator.state_dict(), "saved_models/generator_%d.pth" % epoch)
-            torch.save(discriminator.state_dict(), "saved_models/discriminator_%d.pth" %epoch)
+        # if batches_done % opt.checkpoint_interval == 0:
+        #     # Save model checkpoints
+        #     torch.save(generator.state_dict(), "saved_models/generator_%d.pth" % epoch)
+        #     torch.save(discriminator.state_dict(), "saved_models/discriminator_%d.pth" %epoch)

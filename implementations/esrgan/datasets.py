@@ -9,6 +9,9 @@ from PIL import Image
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as F
 
+from torchvision.utils import save_image
+
+
 # Normalization parameters for pre-trained PyTorch models
 mean = np.array([0.485, 0.456, 0.406])
 std = np.array([0.229, 0.224, 0.225])
@@ -36,6 +39,26 @@ def rgb_to_ycrcb(img):
     ycrcb = torch.stack([y, cr, cb], dim=0)
     return ycrcb
 
+# def ycrcb_to_rgb(img):
+#     r"""Converts a YCrCb image tensor to an RGB image tensor.
+#     Args:
+#         img (torch.Tensor): Input image tensor with dimensions (B, 3, H, W).
+#     Returns:
+#         torch.Tensor: RGB image tensor with dimensions (B, 3, H, W).
+#     """
+#     y, cr, cb = torch.chunk(img, chunks=3, dim=1)
+#     r = y + 1.402 * (cr - 0.5)
+#     g = y - 0.344 * (cb - 0.5) - 0.714 * (cr - 0.5)
+#     b = y + 1.772 * (cb - 0.5)
+#     return torch.cat([r, g, b], dim=1)
+
+def ycrcb_to_rgb(img):
+    y, cr, cb = img[0], img[1], img[2]
+    r = y + 1.402 * (cr - 0.5)
+    g = y - 0.344 * (cb - 0.5) - 0.714 * (cr - 0.5)
+    b = y + 1.772 * (cb - 0.5)
+    rgb = torch.stack([r, g, b], dim=0)
+    return rgb
 
 def denormalize(tensors):
     """ Denormalizes image tensors using mean and std """
@@ -52,14 +75,20 @@ class ImageDataset(Dataset):
             [
                 transforms.Resize((hr_height // 4, hr_height // 4), Image.BICUBIC),
                 transforms.ToTensor(),
-                transforms.Normalize(mean, std),
+                # transforms.Normalize(mean, std),
             ]
         )
         self.hr_transform = transforms.Compose(
             [
                 transforms.Resize((hr_height, hr_height), Image.BICUBIC),
                 transforms.ToTensor(),
-                transforms.Normalize(mean, std),
+                # transforms.Normalize(mean, std),
+            ]
+        )
+
+        self.lr_transform_sub = transforms.Compose(
+            [
+                transforms.Resize((hr_height, hr_height), Image.BICUBIC)
             ]
         )
 
@@ -72,10 +101,14 @@ class ImageDataset(Dataset):
 
 
         ycrcb_hr = rgb_to_ycrcb(img_hr)  # extract Y channel
-
         ycrcb_lr = rgb_to_ycrcb(img_lr) # extract Y channel
 
-        return {"lr": ycrcb_lr[0].unsqueeze(0), "hr": ycrcb_hr[0].unsqueeze(0), "ycrcb_lr":ycrcb_lr, "ycrcb_hr": ycrcb_hr}
+        img_hr_sub = rgb_to_ycrcb(self.lr_transform_sub(img_lr))
+
+        
+
+
+        return {"lr": ycrcb_lr[0].unsqueeze(0), "hr": ycrcb_hr[0].unsqueeze(0), "target_hr":img_hr, "img_hr_sub": img_hr_sub}
 
     def __len__(self):
         return len(self.files)
