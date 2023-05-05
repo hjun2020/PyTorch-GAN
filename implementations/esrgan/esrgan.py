@@ -143,9 +143,13 @@ for epoch in range(opt.epoch, opt.n_epochs):
 
         # Total generator loss
         loss_G = loss_content + opt.lambda_adv * loss_GAN + opt.lambda_pixel * loss_pixel
+        # loss_G = loss_GAN
 
         loss_G.backward()
         optimizer_G.step()
+
+        if i % 10 != 0:
+            continue
 
         # ---------------------
         #  Train Discriminator
