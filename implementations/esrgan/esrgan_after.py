@@ -103,7 +103,7 @@ dataloader = DataLoader(
 #  Training
 # ----------
 
-for epoch in range(opt.epoch, opt.n_epochs):
+for epoch in range(opt.generator_epoch, opt.n_epochs):
     for i, imgs in enumerate(dataloader):
 
         batches_done = epoch * len(dataloader) + i
