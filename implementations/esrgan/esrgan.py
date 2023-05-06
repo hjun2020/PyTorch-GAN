@@ -81,6 +81,10 @@ if opt.epoch != 0:
 optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 
+
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=1e1, gamma=0.5)
+
+
 Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
 
 dataloader = DataLoader(
@@ -90,6 +94,8 @@ dataloader = DataLoader(
     num_workers=opt.n_cpu,
 )
 
+
+flag = True
 # ----------
 #  Training
 # ----------
@@ -119,15 +125,23 @@ for epoch in range(opt.epoch, opt.n_epochs):
         # Measure pixel-wise loss against ground truth
         loss_pixel = criterion_pixel(gen_hr, imgs_hr)
 
-        if batches_done < opt.warmup_batches:
+        # if batches_done < opt.warmup_batches:
+        if batches_done < 2e2:
             # Warm-up (pixel-wise loss only)
             loss_pixel.backward()
             optimizer_G.step()
             print(
-                "[Epoch %d/%d] [Batch %d/%d] [G pixel: %f]"
-                % (epoch, opt.n_epochs, i, len(dataloader), loss_pixel.item())
+                "[Epoch %d/%d] [Batch %d/%d] [G pixel: %f] [learning rate: %f] [batches_done: %d]"
+                % (epoch, opt.n_epochs, i, len(dataloader), loss_pixel.item(), optimizer_G.param_groups[0]['lr'], batches_done)
             )
+            scheduler.step()
             continue
+        
+        if flag:
+            scheduler.step_size=0.5e2 
+            for param_group in optimizer_G.param_groups:
+                param_group['lr'] = 1e-4
+            flag = False
 
         # Extract validity predictions from discriminator
         pred_real = discriminator(imgs_hr).detach()
@@ -148,8 +162,6 @@ for epoch in range(opt.epoch, opt.n_epochs):
         loss_G.backward()
         optimizer_G.step()
 
-        if i % 10 != 0:
-            continue
 
         # ---------------------
         #  Train Discriminator
@@ -175,7 +187,7 @@ for epoch in range(opt.epoch, opt.n_epochs):
         # --------------
 
         print(
-            "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, content: %f, adv: %f, pixel: %f]"
+            "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, content: %f, adv: %f, pixel: %f] [learning rate: %f]"
             % (
                 epoch,
                 opt.n_epochs,
@@ -186,6 +198,7 @@ for epoch in range(opt.epoch, opt.n_epochs):
                 loss_content.item(),
                 loss_GAN.item(),
                 loss_pixel.item(),
+                optimizer_G.param_groups[0]['lr']
             )
         )
 
@@ -199,3 +212,5 @@ for epoch in range(opt.epoch, opt.n_epochs):
             # Save model checkpoints
             torch.save(generator.state_dict(), "saved_models/generator_%d.pth" % epoch)
             torch.save(discriminator.state_dict(), "saved_models/discriminator_%d.pth" %epoch)
+
+    scheduler.step()
