@@ -10,7 +10,7 @@ from PIL import Image
 import cv2
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--image_path", type=str, required=True, help="Path to image")
+parser.add_argument("--image_path", type=str, required=False, help="Path to image")
 parser.add_argument("--checkpoint_model", type=str, required=True, help="Path to checkpoint model")
 parser.add_argument("--channels", type=int, default=3, help="Number of image channels")
 parser.add_argument("--residual_blocks", type=int, default=23, help="Number of residual blocks in G")
@@ -78,12 +78,12 @@ while True:
     # print(output_tensor.shape)
     save_image(output_tensor, "./videos/temp.png")
     # Convert the output tensor to a numpy array and resize it to the original frame size
-    output = output_tensor.squeeze(0).cpu().numpy().transpose(1, 2, 0)
-    cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
-    output = cv2.resize(output, (frame_width, frame_height), interpolation=cv2.INTER_CUBIC)
-    
-    # Write the output frame to the output video file
-    output_video.write(output.astype('uint8'))
+    sr_image_np = output_tensor.squeeze().numpy().transpose(1, 2, 0)
+    sr_image_np = cv2.resize(sr_image_np, (1280, 720), interpolation=cv2.INTER_CUBIC)
+    sr_image_np = (sr_image_np).clip(0, 255).astype('uint8')
+
+    # Write frame to video file
+    output_video.write(sr_image_np)
     
 input_video.release()
 output_video.release()

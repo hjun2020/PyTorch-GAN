@@ -62,21 +62,27 @@ hr_shape = (opt.hr_height, opt.hr_width)
 # Initialize generator and discriminator
 generator = GeneratorRRDB(opt.channels, filters=64, num_res_blocks=opt.residual_blocks).to(device)
 
+# Optimizers
+optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
+
+# Scheduler
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=2e5, gamma=0.5)
 
 # Set feature extractor to inference mode
 
 # Losses
 criterion_pixel = torch.nn.L1Loss().to(device)
 
-if opt.epoch != 0:
+# if opt.epoch != 0:
     # Load pretrained models
-    generator.load_state_dict(torch.load("saved_models/generator_pre_%d.pth" % opt.epoch))
+    # generator.load_state_dict(torch.load("saved_models/generator_pre_voc_%d.pth" % opt.epoch))
 
-# Optimizers
-optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
+checkpoint = torch.load("saved_models/generator_pre_voc_%d.pth" % opt.epoch)
+generator.load_state_dict(checkpoint['model_state_dict'])
+optimizer_G.load_state_dict(checkpoint['optimizer_state_dict'])
+scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
 
 
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=5e3, gamma=0.5)
 
 
 Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
@@ -95,6 +101,7 @@ dataloader = DataLoader(
 
 for epoch in range(opt.epoch, opt.n_epochs):
     for i, imgs in enumerate(dataloader):
+        print(scheduler.last_epoch, "!!!!!!!!!!!")
 
         batches_done = epoch * len(dataloader) + i
 
@@ -135,10 +142,14 @@ for epoch in range(opt.epoch, opt.n_epochs):
             # Save image grid with upsampled inputs and ESRGAN outputs
             imgs_lr = nn.functional.interpolate(imgs_lr, scale_factor=4)
             img_grid = denormalize(torch.cat((imgs_lr, gen_hr), -1))
-            save_image(img_grid, "images/training/pre_%d.png" % batches_done, nrow=1, normalize=False)
+            save_image(img_grid, "images/training/pre_voc_%d.png" % batches_done, nrow=1, normalize=False)
 
         if batches_done % opt.checkpoint_interval == 0:
             # Save model checkpoints
-            torch.save(generator.state_dict(), "saved_models/generator_pre_%d.pth" % epoch)
+            # torch.save(generator.state_dict(), "saved_models/generator_pre_voc_%d.pth" % epoch)
 
-
+            torch.save({
+                'model_state_dict': generator.state_dict(),
+                'optimizer_state_dict': optimizer_G.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict()
+            }, "saved_models/generator_pre_voc_%d.pth" % epoch)

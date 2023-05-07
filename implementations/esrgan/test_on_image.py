@@ -36,4 +36,4 @@ with torch.no_grad():
 
 # Save image
 fn = opt.image_path.split("/")[-1]
-save_image(sr_image, f"images/outputs/sr-{fn}")
+save_image(sr_image, f"images/outputs/sr-{fn}",  normalize=False)

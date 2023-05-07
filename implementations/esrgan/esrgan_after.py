@@ -75,7 +75,7 @@ criterion_content = torch.nn.L1Loss().to(device)
 criterion_pixel = torch.nn.L1Loss().to(device)
 
 if opt.generator_epoch != 0:
-    generator.load_state_dict(torch.load("saved_models/generator_pre_%d.pth" % opt.generator_epoch))
+    generator.load_state_dict(torch.load("saved_models/generator_after_%d.pth" % opt.generator_epoch))
 
 if opt.discriminator_epoch != 0:
     discriminator.load_state_dict(torch.load("saved_models/discriminator_%d.pth" % opt.discriminator_epoch))
@@ -103,7 +103,7 @@ dataloader = DataLoader(
 #  Training
 # ----------
 
-for epoch in range(opt.generator_epoch, opt.n_epochs):
+for epoch in range(opt.epoch, opt.n_epochs):
     for i, imgs in enumerate(dataloader):
 
         batches_done = epoch * len(dataloader) + i
@@ -127,8 +127,6 @@ for epoch in range(opt.generator_epoch, opt.n_epochs):
 
 
 
-        gen_hr_temp = denormalize(gen_hr)
-        save_image(gen_hr_temp[0], "images/training/temp.png", normalize=False)
 
         # Measure pixel-wise loss against ground truth
         loss_pixel = criterion_pixel(gen_hr, imgs_hr)
